@@ -1,0 +1,337 @@
+.smart-camera-control {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+.camera-configuration {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.camera-configuration select,
+.camera-configuration button {
+  margin: 5px;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.video-container {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto 20px;
+  border: 2px solid #333;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.video-container video {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.controls-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.control-group {
+  padding: 10px;
+  background: #f9f9f9;
+  border-radius: 6px;
+}
+
+.control-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.control-group input[type="range"] {
+  width: 100%;
+}
+
+.zoom-controls {
+  display: flex;
+  gap: 5px;
+}
+
+.zoom-controls button {
+  flex: 1;
+  padding: 5px;
+}
+
+.score-display {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  font-size: 0.9em;
+}
+
+.capture-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.capture-buttons button {
+  padding: 10px 15px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.capture-buttons button:hover {
+  background: #0056b3;
+}
+
+.capture-buttons button.recording {
+  background: #dc3545;
+}
+
+.liveliness-challenge {
+  padding: 15px;
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.preview-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.preview-content {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 500px;
+  text-align: center;
+}
+
+.preview-content img {
+  max-width: 100%;
+  max-height: 400px;
+  margin: 10px 0;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 15px;
+}
+
+.gallery {
+  margin-top: 30px;
+}
+
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.image-item {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 5px;
+  text-align: center;
+}
+
+.image-item img {
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.image-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8em;
+  margin-top: 5px;
+}
+
+button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: #007bff;
+  color: white;
+}
+
+button:hover {
+  background: #0056b3;
+}
+
+button:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Add these to your existing CSS */
+
+.location-control {
+  margin-top: 10px;
+  padding: 10px;
+  background: #e9f7ef;
+  border-radius: 4px;
+}
+
+.location-control button.enabled {
+  background: #28a745;
+}
+
+.location-info {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.9em;
+  color: #666;
+}
+
+.zoom-overlay {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.zoom-controls,
+.brightness-controls {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 5px;
+}
+
+.zoom-controls button,
+.brightness-controls button {
+  flex: 1;
+  padding: 8px 5px;
+  font-size: 0.8em;
+}
+
+.countdown {
+  font-style: italic;
+  color: #666;
+  margin-top: 5px;
+}
+
+.gallery-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.location-indicator {
+  color: #ff6b6b;
+}
+
+.preview-info {
+  text-align: left;
+  margin: 10px 0;
+}
+
+.preview-info p {
+  margin: 5px 0;
+  font-size: 0.9em;
+}
+
+/* Permission Status Styles */
+.permission-status {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 6px;
+  background: white;
+}
+
+.status-item:last-child {
+  margin-bottom: 0;
+}
+
+.status-icon {
+  font-size: 1.2em;
+  margin-right: 10px;
+}
+
+.status-text {
+  flex: 1;
+  font-size: 0.9em;
+}
+
+.retry-btn {
+  padding: 5px 10px;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8em;
+}
+
+.retry-btn:hover {
+  background: #5a6268;
+}
+
+/* Status-specific styles */
+.status-item.requesting {
+  background: #fff3cd;
+  border-left: 3px solid #ffc107;
+}
+
+.status-item.granted {
+  background: #d4edda;
+  border-left: 3px solid #28a745;
+}
+
+.status-item.denied {
+  background: #f8d7da;
+  border-left: 3px solid #dc3545;
+}
+
+.status-item.timeout {
+  background: #fff3cd;
+  border-left: 3px solid #ffc107;
+}
+
+.status-item.unsupported {
+  background: #e2e3e5;
+  border-left: 3px solid #6c757d;
+}
+
+/* Rest of your existing CSS remains the same */
+
