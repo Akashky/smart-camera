@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -12,10 +12,15 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { SelfieSegmentation } from "@mediapipe/selfie_segmentation";
+import { FaceMesh } from "@mediapipe/face_mesh";
 import { Camera } from "@mediapipe/camera_utils";
 import gifshot from "gifshot";
 import SnapshotPreview from "./SnapshotPreview";
 import { getExactAddress } from "./Helper";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
+import { challenges } from "../utils/constants/SmartCamera";
+import { useSomething } from "../utils/hooks/useSomething";
 
 const SmartCameraControl = ({ blurEnabled = true }) => {
   const videoRef = useRef(null);
@@ -23,7 +28,21 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
   const bgCanvasRef = useRef(null);
   const personCanvasRef = useRef(null);
   const segmentationRef = useRef(null);
+  const faceMeshRef = useRef(null);
   const cameraRef = useRef(null);
+
+  // Use the liveness detection hook
+  const {
+    isVerifying,
+    completedChallenges,
+    detectLivenessActions,
+    handleStartVerification,
+    handleStopVerification,
+  } = useSomething();
+
+
+
+
 
   const [blurAmount, setBlurAmount] = useState(12);
   const [brightness, setBrightness] = useState(1);
@@ -71,12 +90,17 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
     });
   }, []);
 
-  const startCamera = async (video, mounted) => {
+ 
+
+  const startCamera = useCallback(async (video, mounted) => {
     try {
       if (!video) return;
       cameraRef.current = new Camera(video, {
         onFrame: async () => {
           await segmentationRef.current?.send({ image: video });
+          if (isVerifying && faceMeshRef.current) {
+            await faceMeshRef.current.send({ image: video });
+          }
         },
         width: 1280,
         height: 720,
@@ -88,7 +112,7 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
       setError("Camera access is blocked by your browser. Go to Settings → Site Permissions to enable it.");
       setIsReady(false);
     }
-  };
+  }, [isVerifying]);
 
   useEffect(() => {
     let mounted = true;
@@ -215,6 +239,29 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
 
     segmentationRef.current = selfieSegmentation;
 
+    // Initialize Face Mesh for liveness detection
+    const faceMesh = new FaceMesh({
+      locateFile: (file) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+    });
+    faceMesh.setOptions({
+      maxNumFaces: 1,
+      refineLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    });
+
+    faceMesh?.onResults((results) => {
+      if (!mounted || !isVerifying) return;
+      
+      if (results?.multiFaceLandmarks && results?.multiFaceLandmarks?.length > 0) {
+        const landmarks = results?.multiFaceLandmarks[0];
+        detectLivenessActions(landmarks);
+      }
+    });
+
+    faceMeshRef.current = faceMesh;
+
     startCamera(video, mounted);
 
     return () => {
@@ -222,8 +269,9 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
       cameraRef.current?.stop();
       cameraRef.current = null;
       segmentationRef.current = null;
+      faceMeshRef.current = null;
     };
-  }, [blurEnabled]);
+  }, [blurEnabled, isVerifying, detectLivenessActions, startCamera]);
 
   const handleSnapshot = () => {
     const canvas = outputCanvasRef.current;
@@ -363,9 +411,18 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
         <Button
           variant="contained"
           onClick={handleSnapshot}
-          disabled={!isReady}
+          disabled={!isReady || isVerifying}
         >
           Capture
+        </Button>
+
+        <Button
+          variant="contained"
+          color={isVerifying ? "error" : "success"}
+          onClick={isVerifying ? handleStopVerification : handleStartVerification}
+          disabled={!isReady}
+        >
+          {isVerifying ? "Stop Verify" : "Verify"}
         </Button>
       </Stack>
 
@@ -379,6 +436,50 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
           ? "Camera active"
           : "Starting camera... allow permission if prompted."}
       </Typography>
+
+      {/* Liveness Detection Challenges */}
+      {isVerifying && (
+        <Box mt={3} p={2} bgcolor="#f5f5f5" borderRadius={2}>
+          <Typography variant="subtitle1" fontWeight={600} mb={2}>
+            Complete these challenges:
+          </Typography>
+          <Stack spacing={1.5}>
+            {challenges.map((challenge, index) => (
+              <Box
+                key={index}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.5,
+                  p: 1,
+                  borderRadius: 1,
+                  bgcolor: completedChallenges.has(index)
+                    ? "#e8f5e9"
+                    : "transparent",
+                  transition: "background-color 0.3s",
+                }}
+              >
+                {completedChallenges.has(index) ? (
+                  <CheckCircleIcon sx={{ color: "#4caf50" }} />
+                ) : (
+                  <RadioButtonUncheckedIcon sx={{ color: "#9e9e9e" }} />
+                )}
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: completedChallenges.has(index)
+                      ? "#2e7d32"
+                      : "#424242",
+                    fontWeight: completedChallenges.has(index) ? 600 : 400,
+                  }}
+                >
+                  {challenge}
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+      )}
       </>
       )}
       {/* === Saved Snapshots === */}
