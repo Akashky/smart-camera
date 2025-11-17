@@ -1,8 +1,15 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useMemo } from "react";
+import { challenges } from "../constants/SmartCamera";
 
 export const useSomething = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [completedChallenges, setCompletedChallenges] = useState(new Set());
+  const TOTAL_CHALLENGES = challenges?.length;
+  
+  // Check if all challenges are completed
+  const isAllVerified = useMemo(() => {
+    return completedChallenges.size === TOTAL_CHALLENGES;
+  }, [completedChallenges, TOTAL_CHALLENGES]);
 
   // Face detection state
   const faceDetectionStateRef = useRef({
@@ -257,5 +264,6 @@ export const useSomething = () => {
     detectLivenessActions,
     handleStartVerification,
     handleStopVerification,
+    isAllVerified,
   };
 };
