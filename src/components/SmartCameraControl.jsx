@@ -19,6 +19,7 @@ import SnapshotPreview from "./SnapshotPreview";
 import { getExactAddress } from "./Helper";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import { challenges } from "../utils/constants/SmartCamera";
 import { useSomething } from "../utils/hooks/useSomething";
 
@@ -38,6 +39,7 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
     detectLivenessActions,
     handleStartVerification,
     handleStopVerification,
+    isAllVerified,
   } = useSomething();
 
 
@@ -418,11 +420,11 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
 
         <Button
           variant="contained"
-          color={isVerifying ? "error" : "success"}
+          color={isAllVerified ? "success" : isVerifying ? "error" : "success"}
           onClick={isVerifying ? handleStopVerification : handleStartVerification}
           disabled={!isReady}
         >
-          {isVerifying ? "Stop Verify" : "Verify"}
+          {isAllVerified ? "Verified" : isVerifying ? "Stop Verify" : "Verify"}
         </Button>
       </Stack>
 
@@ -440,44 +442,85 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
       {/* Liveness Detection Challenges */}
       {isVerifying && (
         <Box mt={3} p={2} bgcolor="#f5f5f5" borderRadius={2}>
-          <Typography variant="subtitle1" fontWeight={600} mb={2}>
-            Complete these challenges:
-          </Typography>
-          <Stack spacing={1.5}>
-            {challenges.map((challenge, index) => (
-              <Box
-                key={index}
+          {isAllVerified ? (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                py: 3,
+                gap: 2,
+              }}
+            >
+              <VerifiedIcon
                 sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1.5,
-                  p: 1,
-                  borderRadius: 1,
-                  bgcolor: completedChallenges.has(index)
-                    ? "#e8f5e9"
-                    : "transparent",
-                  transition: "background-color 0.3s",
+                  fontSize: 64,
+                  color: "#4caf50",
+                }}
+              />
+              <Typography
+                variant="h5"
+                fontWeight={700}
+                sx={{
+                  color: "#2e7d32",
+                  textAlign: "center",
                 }}
               >
-                {completedChallenges.has(index) ? (
-                  <CheckCircleIcon sx={{ color: "#4caf50" }} />
-                ) : (
-                  <RadioButtonUncheckedIcon sx={{ color: "#9e9e9e" }} />
-                )}
-                <Typography
-                  variant="body2"
-                  sx={{
-                    color: completedChallenges.has(index)
-                      ? "#2e7d32"
-                      : "#424242",
-                    fontWeight: completedChallenges.has(index) ? 600 : 400,
-                  }}
-                >
-                  {challenge}
-                </Typography>
-              </Box>
-            ))}
-          </Stack>
+                Verified!
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "#424242",
+                  textAlign: "center",
+                }}
+              >
+                All challenges completed successfully
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <Typography variant="subtitle1" fontWeight={600} mb={2}>
+                Complete these challenges:
+              </Typography>
+              <Stack spacing={1.5}>
+                {challenges.map((challenge, index) => (
+                  <Box
+                    key={index}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1.5,
+                      p: 1,
+                      borderRadius: 1,
+                      bgcolor: completedChallenges.has(index)
+                        ? "#e8f5e9"
+                        : "transparent",
+                      transition: "background-color 0.3s",
+                    }}
+                  >
+                    {completedChallenges.has(index) ? (
+                      <CheckCircleIcon sx={{ color: "#4caf50" }} />
+                    ) : (
+                      <RadioButtonUncheckedIcon sx={{ color: "#9e9e9e" }} />
+                    )}
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: completedChallenges.has(index)
+                          ? "#2e7d32"
+                          : "#424242",
+                        fontWeight: completedChallenges.has(index) ? 600 : 400,
+                      }}
+                    >
+                      {challenge}
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
+            </>
+          )}
         </Box>
       )}
       </>
