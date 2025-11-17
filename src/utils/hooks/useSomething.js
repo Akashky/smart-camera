@@ -1,9 +1,10 @@
 import { useRef, useState, useCallback, useMemo } from "react";
 import { challenges } from "../constants/SmartCamera";
 
-export const useSomething = () => {
+export const useSomething = (onChallengeComplete) => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [completedChallenges, setCompletedChallenges] = useState(new Set());
+  const capturedChallengesRef = useRef(new Set()); // Track which challenges have been captured
   const TOTAL_CHALLENGES = challenges?.length;
   
   // Check if all challenges are completed
@@ -153,7 +154,18 @@ export const useSomething = () => {
     
     // Detect blink
     if (state.previousEyeAspectRatio > 0.25 && avgEAR < 0.2) {
-      setCompletedChallenges((prev) => new Set(prev).add(0)); // "Blink your eyes"
+      setCompletedChallenges((prev) => {
+        const newSet = new Set(prev);
+        if (!newSet.has(0)) {
+          newSet.add(0); // "Blink your eyes"
+          // Capture image for blink challenge
+          if (onChallengeComplete && !capturedChallengesRef.current.has(0)) {
+            capturedChallengesRef.current.add(0);
+            onChallengeComplete(0, "blink_eyes");
+          }
+        }
+        return newSet;
+      });
     }
     state.previousEyeAspectRatio = avgEAR;
     state.eyeAspectRatio = avgEAR;
@@ -171,7 +183,13 @@ export const useSomething = () => {
       setCompletedChallenges((prev) => {
         if (!prev.has(1)) {
           state.leftTurnDetected = true; // Mark as detected to prevent multiple triggers
-          return new Set(prev).add(1); // "Turn your head left" (index 1)
+          const newSet = new Set(prev).add(1); // "Turn your head left" (index 1)
+          // Capture image for turn left challenge
+          if (onChallengeComplete && !capturedChallengesRef.current.has(1)) {
+            capturedChallengesRef.current.add(1);
+            onChallengeComplete(1, "turn_left");
+          }
+          return newSet;
         }
         return prev;
       });
@@ -188,7 +206,13 @@ export const useSomething = () => {
       setCompletedChallenges((prev) => {
         if (!prev.has(2)) {
           state.rightTurnDetected = true; // Mark as detected to prevent multiple triggers
-          return new Set(prev).add(2); // "Turn your head right" (index 2)
+          const newSet = new Set(prev).add(2); // "Turn your head right" (index 2)
+          // Capture image for turn right challenge
+          if (onChallengeComplete && !capturedChallengesRef.current.has(2)) {
+            capturedChallengesRef.current.add(2);
+            onChallengeComplete(2, "turn_right");
+          }
+          return newSet;
         }
         return prev;
       });
@@ -205,7 +229,18 @@ export const useSomething = () => {
     // Detect smile using mouth corner elevation (works with closed mouth)
     const isSmiling = detectSmile(landmarks);
     if (isSmiling) {
-      setCompletedChallenges((prev) => new Set(prev).add(3)); // "Smile"
+      setCompletedChallenges((prev) => {
+        const newSet = new Set(prev);
+        if (!newSet.has(3)) {
+          newSet.add(3); // "Smile"
+          // Capture image for smile challenge
+          if (onChallengeComplete && !capturedChallengesRef.current.has(3)) {
+            capturedChallengesRef.current.add(3);
+            onChallengeComplete(3, "smile");
+          }
+        }
+        return newSet;
+      });
     }
 
     // Detect nod yes (vertical movement)
@@ -217,7 +252,18 @@ export const useSomething = () => {
       const max = Math.max(...state.headNodHistory);
       const min = Math.min(...state.headNodHistory);
       if (max - min > 0.3) {
-        setCompletedChallenges((prev) => new Set(prev).add(4)); // "Nod your head Yes"
+        setCompletedChallenges((prev) => {
+          const newSet = new Set(prev);
+          if (!newSet.has(4)) {
+            newSet.add(4); // "Nod your head Yes"
+            // Capture image for nod yes challenge
+            if (onChallengeComplete && !capturedChallengesRef.current.has(4)) {
+              capturedChallengesRef.current.add(4);
+              onChallengeComplete(4, "nod_yes");
+            }
+          }
+          return newSet;
+        });
       }
     }
 
@@ -230,14 +276,26 @@ export const useSomething = () => {
       const max = Math.max(...state.headShakeHistory);
       const min = Math.min(...state.headShakeHistory);
       if (max - min > 0.4) {
-        setCompletedChallenges((prev) => new Set(prev).add(5)); // "Nod your head No"
+        setCompletedChallenges((prev) => {
+          const newSet = new Set(prev);
+          if (!newSet.has(5)) {
+            newSet.add(5); // "Nod your head No"
+            // Capture image for nod no challenge
+            if (onChallengeComplete && !capturedChallengesRef.current.has(5)) {
+              capturedChallengesRef.current.add(5);
+              onChallengeComplete(5, "nod_no");
+            }
+          }
+          return newSet;
+        });
       }
     }
-  }, [isVerifying]);
+  }, [isVerifying, onChallengeComplete]);
 
   const handleStartVerification = useCallback(() => {
     setIsVerifying(true);
     setCompletedChallenges(new Set());
+    capturedChallengesRef.current = new Set(); // Reset captured challenges
     faceDetectionStateRef.current = {
       eyeAspectRatio: 0,
       previousEyeAspectRatio: 0,
@@ -253,6 +311,7 @@ export const useSomething = () => {
   const handleStopVerification = useCallback(() => {
     setIsVerifying(false);
     setCompletedChallenges(new Set());
+    capturedChallengesRef.current = new Set(); // Reset captured challenges
   }, []);
 
   return {
