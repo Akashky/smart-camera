@@ -21,6 +21,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import { challenges } from "../utils/constants/SmartCamera";
 import { useSomething } from "../utils/hooks/useSomething";
+import { computeClarity, computeContrastScore, computeLightingScore, computeSharpnessScore } from "../utils/imageQualityHelpers";
 
 const SmartCameraControl = ({ blurEnabled = true }) => {
   const videoRef = useRef(null);
@@ -56,6 +57,11 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
   const [snapshots, setSnapshots] = useState([]);
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
+  const [qualityScore, setQualityScore] = useState({
+    lighting: 0,
+    sharpness: 0,
+    clarity: 0,
+  });
 
   // GIF creation
   const [gifSrc, setGifSrc] = useState(null);
@@ -234,6 +240,27 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
 
       outCtx.drawImage(bgCanvas, 0, 0, outputW, outputH);
       outCtx.drawImage(personCanvas, 0, 0, outputW, outputH);
+
+      // === Quality Scoring ===
+      if (blurEnabled && outputCanvasRef.current) {
+        try {
+          const frame = personCtx.getImageData(0, 0, outputW, outputH);
+          // compute robust metrics (fast thanks to downsampling)
+          const lighting = computeLightingScore(frame);    // 0..100
+          const sharpness = computeSharpnessScore(frame);  // 0..100 (higher = sharper)
+          const contrast = computeContrastScore(frame);    // 0..100
+          const clarity = computeClarity(lighting, sharpness, contrast);
+
+          setQualityScore({
+            lighting,
+            sharpness, 
+            clarity,
+          });
+        } catch (e) {
+          console.log("Quality scoring error:", e);
+        }
+      }
+
       outCtx.restore();
     });
 
@@ -482,7 +509,6 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
       )}
       </>
       )}
-      {/* === Saved Snapshots === */}
       {snapshots.length > 0 && (
         <Box mt={3}>
           <Typography variant="subtitle1">Saved Snapshots:</Typography>
@@ -546,6 +572,28 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
           </Box>
         </Box>
       )}
+
+      {blurEnabled && (
+      <Box
+        sx={{
+          position: "absolute",
+          bottom: 8,
+          right: 8,
+          bgcolor: "rgba(0,0,0,0.6)",
+          color: "#fff",
+          p: 1,
+          borderRadius: 1,
+          fontSize: "0.75rem",
+          textAlign: "right",
+          lineHeight: 1.3,
+        }}
+      >
+        <div>💡 Lighting: {qualityScore.lighting}%</div>
+        <div>🌫️ Sharpness: {qualityScore.sharpness}%</div>
+        <div>🔍 Clarity: {qualityScore.clarity}%</div>
+      </Box>
+      )}
+
 
       {/* Snapshot Preview Dialog */}
       <SnapshotPreview
