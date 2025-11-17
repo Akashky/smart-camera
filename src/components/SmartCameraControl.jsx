@@ -31,16 +31,7 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
   const segmentationRef = useRef(null);
   const faceMeshRef = useRef(null);
   const cameraRef = useRef(null);
-
-  // Use the liveness detection hook
-  const {
-    isVerifying,
-    completedChallenges,
-    detectLivenessActions,
-    handleStartVerification,
-    handleStopVerification,
-    isAllVerified,
-  } = useSomething();
+  const challengeImageCaptureRef = useRef(null);
 
 
 
@@ -68,6 +59,39 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
   const brightnessRef = useRef(brightness);
   const zoomRef = useRef(zoom);
   const aspectRef = useRef(aspectRatio);
+  
+  // Function to capture and save image when challenge is completed
+  const handleChallengeImageCapture = useCallback(() => {
+    const canvas = outputCanvasRef.current;
+    if (!canvas) return;
+
+    // Capture image from canvas
+    const imageData = canvas.toDataURL("image/png");
+    
+    // Add to snapshots for display and storage
+    setSnapshots((prev) => [...prev, imageData]);
+  }, []);
+  
+  // Update the ref whenever the callback changes
+  useEffect(() => {
+    challengeImageCaptureRef.current = handleChallengeImageCapture;
+  }, [handleChallengeImageCapture]);
+  
+  const onChallengeCompleteCallback = useCallback((challengeIndex, challengeName) => {
+    if (challengeImageCaptureRef.current) {
+      challengeImageCaptureRef.current(challengeIndex, challengeName);
+    }
+  }, []);
+  
+  // useSomething hook
+  const {
+    isVerifying,
+    completedChallenges,
+    detectLivenessActions,
+    handleStartVerification,
+    handleStopVerification,
+    isAllVerified,
+  } = useSomething(onChallengeCompleteCallback);
 
   useEffect(() => {
     blurRef.current = blurAmount;
