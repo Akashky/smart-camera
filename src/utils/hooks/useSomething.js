@@ -161,7 +161,7 @@ export const useSomething = (onChallengeComplete) => {
           // Capture image for blink challenge
           if (onChallengeComplete && !capturedChallengesRef.current.has(0)) {
             capturedChallengesRef.current.add(0);
-            onChallengeComplete(0, "blink_eyes");
+            onChallengeComplete(0, challenges[0]);
           }
         }
         return newSet;
@@ -187,7 +187,7 @@ export const useSomething = (onChallengeComplete) => {
           // Capture image for turn left challenge
           if (onChallengeComplete && !capturedChallengesRef.current.has(1)) {
             capturedChallengesRef.current.add(1);
-            onChallengeComplete(1, "turn_left");
+            onChallengeComplete(1, challenges[1]);
           }
           return newSet;
         }
@@ -210,7 +210,7 @@ export const useSomething = (onChallengeComplete) => {
           // Capture image for turn right challenge
           if (onChallengeComplete && !capturedChallengesRef.current.has(2)) {
             capturedChallengesRef.current.add(2);
-            onChallengeComplete(2, "turn_right");
+            onChallengeComplete(2, challenges[2]);
           }
           return newSet;
         }
@@ -236,7 +236,7 @@ export const useSomething = (onChallengeComplete) => {
           // Capture image for smile challenge
           if (onChallengeComplete && !capturedChallengesRef.current.has(3)) {
             capturedChallengesRef.current.add(3);
-            onChallengeComplete(3, "smile");
+            onChallengeComplete(3, challenges[3]);
           }
         }
         return newSet;
@@ -259,7 +259,7 @@ export const useSomething = (onChallengeComplete) => {
             // Capture image for nod yes challenge
             if (onChallengeComplete && !capturedChallengesRef.current.has(4)) {
               capturedChallengesRef.current.add(4);
-              onChallengeComplete(4, "nod_yes");
+              onChallengeComplete(4, challenges[4]);
             }
           }
           return newSet;
@@ -283,7 +283,7 @@ export const useSomething = (onChallengeComplete) => {
             // Capture image for nod no challenge
             if (onChallengeComplete && !capturedChallengesRef.current.has(5)) {
               capturedChallengesRef.current.add(5);
-              onChallengeComplete(5, "nod_no");
+              onChallengeComplete(5, challenges[5]);
             }
           }
           return newSet;
