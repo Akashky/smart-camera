@@ -46,7 +46,7 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
   // Snapshot + Preview states
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
-  const [snapshots, setSnapshots] = useState([]); // Array of { image: string, challengeName: string | null }
+  const [snapshots, setSnapshots] = useState([]); 
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
 
