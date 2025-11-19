@@ -46,7 +46,7 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
   // Snapshot + Preview states
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
-  const [snapshots, setSnapshots] = useState([]);
+  const [snapshots, setSnapshots] = useState([]); // Array of { image: string, challengeName: string | null }
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
 
@@ -61,15 +61,15 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
   const aspectRef = useRef(aspectRatio);
   
   // Function to capture and save image when challenge is completed
-  const handleChallengeImageCapture = useCallback(() => {
+  const handleChallengeImageCapture = useCallback((challengeIndex, challengeName) => {
     const canvas = outputCanvasRef.current;
     if (!canvas) return;
 
     // Capture image from canvas
     const imageData = canvas.toDataURL("image/png");
     
-    // Add to snapshots for display and storage
-    setSnapshots((prev) => [...prev, imageData]);
+    // Add to snapshots for display and storage with challenge name
+    setSnapshots((prev) => [...prev, { image: imageData, challengeName: challengeName || null }]);
   }, []);
   
   // Update the ref whenever the callback changes
@@ -308,7 +308,7 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
   };
 
   const handleKeepSnapshot = () => {
-    setSnapshots((prev) => [...prev, previewImage]);
+    setSnapshots((prev) => [...prev, { image: previewImage, challengeName: null }]);
     setPreviewOpen(false);
     setPreviewImage(null);
   };
@@ -326,9 +326,11 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
     }
 
     setIsCreatingGif(true);
+    // Extract just the image URLs from snapshot objects
+    const imageUrls = snapshots.map(snap => snap.image);
     gifshot.createGIF(
       {
-        images: snapshots,
+        images: imageUrls,
         gifWidth: 480,
         gifHeight: 480 / aspectRatio,
         interval: 0.5, // frame delay in seconds
@@ -554,17 +556,39 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
         <Box mt={3}>
           <Typography variant="subtitle1">Saved Snapshots:</Typography>
           <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mt: 1 }}>
-            {snapshots.map((img, i) => (
-              <img
+            {snapshots.map((snap, i) => (
+              <Box
                 key={i}
-                src={img}
-                alt={`snapshot-${i}`}
-                style={{
-                  width: 120,
-                  borderRadius: 8,
-                  border: "1px solid #ccc",
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 0.5,
                 }}
-              />
+              >
+                <img
+                  src={snap.image}
+                  alt={`snapshot-${i}`}
+                  style={{
+                    width: 120,
+                    borderRadius: 8,
+                    border: "1px solid #ccc",
+                  }}
+                />
+                {snap.challengeName && (
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      textAlign: "center",
+                      color: "text.secondary",
+                      fontSize: "0.75rem",
+                      maxWidth: 120,
+                    }}
+                  >
+                    {snap.challengeName}
+                  </Typography>
+                )}
+              </Box>
             ))}
           </Box>
 
