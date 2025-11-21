@@ -10,9 +10,8 @@ import {
   FormControl,
   InputLabel,
   CircularProgress,
+  IconButton,
 } from "@mui/material";
-import { SelfieSegmentation } from "@mediapipe/selfie_segmentation";
-import { FaceMesh } from "@mediapipe/face_mesh";
 import { Camera } from "@mediapipe/camera_utils";
 import gifshot from "gifshot";
 import SnapshotPreview from "./SnapshotPreview";
@@ -20,9 +19,16 @@ import { getExactAddress } from "./Helper";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import FlipCameraIosIcon from "@mui/icons-material/FlipCameraIos";
 import { challenges } from "../utils/constants/SmartCamera";
 import { useSomething } from "../utils/hooks/useSomething";
-import { computeClarity, computeContrastScore, computeLightingScore, computeSharpnessScore } from "../utils/imageQualityHelpers";
+import {
+  computeClarity,
+  computeContrastScore,
+  computeLightingScore,
+  computeSharpnessScore,
+} from "../utils/imageQualityHelpers";
+import { initializeMediaPipeModels } from "../utils/mediaipipeInit";
 
 const SmartCameraControl = ({ blurEnabled = true }) => {
   const videoRef = useRef(null);
@@ -33,10 +39,7 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
   const faceMeshRef = useRef(null);
   const cameraRef = useRef(null);
   const challengeImageCaptureRef = useRef(null);
-
-
-
-
+  const [facingMode, setFacingMode] = useState("user");
 
   const [blurAmount, setBlurAmount] = useState(12);
   const [brightness, setBrightness] = useState(1);
@@ -47,7 +50,7 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
   // Snapshot + Preview states
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
-  const [snapshots, setSnapshots] = useState([]); 
+  const [snapshots, setSnapshots] = useState([]);
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
   const [qualityScore, setQualityScore] = useState({
@@ -65,30 +68,39 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
   const brightnessRef = useRef(brightness);
   const zoomRef = useRef(zoom);
   const aspectRef = useRef(aspectRatio);
-  
-  // Function to capture and save image when challenge is completed
-  const handleChallengeImageCapture = useCallback((challengeIndex, challengeName) => {
-    const canvas = outputCanvasRef.current;
-    if (!canvas) return;
 
-    // Capture image from canvas
-    const imageData = canvas.toDataURL("image/png");
-    
-    // Add to snapshots for display and storage with challenge name
-    setSnapshots((prev) => [...prev, { image: imageData, challengeName: challengeName || null }]);
-  }, []);
-  
+  // Function to capture and save image when challenge is completed
+  const handleChallengeImageCapture = useCallback(
+    (challengeIndex, challengeName) => {
+      const canvas = outputCanvasRef.current;
+      if (!canvas) return;
+
+      // Capture image from canvas
+      const imageData = canvas.toDataURL("image/png");
+
+      // Add to snapshots for display and storage with challenge name
+      setSnapshots((prev) => [
+        ...prev,
+        { image: imageData, challengeName: challengeName || null },
+      ]);
+    },
+    []
+  );
+
   // Update the ref whenever the callback changes
   useEffect(() => {
     challengeImageCaptureRef.current = handleChallengeImageCapture;
   }, [handleChallengeImageCapture]);
-  
-  const onChallengeCompleteCallback = useCallback((challengeIndex, challengeName) => {
-    if (challengeImageCaptureRef.current) {
-      challengeImageCaptureRef.current(challengeIndex, challengeName);
-    }
-  }, []);
-  
+
+  const onChallengeCompleteCallback = useCallback(
+    (challengeIndex, challengeName) => {
+      if (challengeImageCaptureRef.current) {
+        challengeImageCaptureRef.current(challengeIndex, challengeName);
+      }
+    },
+    []
+  );
+
   // useSomething hook
   const {
     isVerifying,
@@ -122,29 +134,38 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
     });
   }, []);
 
- 
+  const startCamera = useCallback(
+    async (video, mounted, facing = facingMode) => {
+      try {
+        if (!video) return;
+        // Stop current camera if running
+        if (cameraRef.current) {
+          cameraRef.current.stop();
+        }
 
-  const startCamera = useCallback(async (video, mounted) => {
-    try {
-      if (!video) return;
-      cameraRef.current = new Camera(video, {
-        onFrame: async () => {
-          await segmentationRef.current?.send({ image: video });
-          if (isVerifying && faceMeshRef.current) {
-            await faceMeshRef.current.send({ image: video });
-          }
-        },
-        width: 1280,
-        height: 720,
-      });
-      await cameraRef.current.start();
-      if (mounted) setIsReady(true);
-    } catch (err) {
-      console.log("Camera start error:", err);
-      setError("Camera access is blocked by your browser. Go to Settings → Site Permissions to enable it.");
-      setIsReady(false);
-    }
-  }, [isVerifying]);
+        cameraRef.current = new Camera(video, {
+          onFrame: async () => {
+            await segmentationRef.current?.send({ image: video });
+            if (isVerifying && faceMeshRef.current) {
+              await faceMeshRef.current.send({ image: video });
+            }
+          },
+          width: 1280,
+          height: 720,
+          facingMode: facing,
+        });
+        await cameraRef.current.start();
+        if (mounted) setIsReady(true);
+      } catch (err) {
+        console.log("Camera start error:", err);
+        setError(
+          "Camera access is blocked by your browser. Go to Settings → Site Permissions to enable it."
+        );
+        setIsReady(false);
+      }
+    },
+    [isVerifying, facingMode]
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -158,164 +179,175 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
     const bgCanvas = bgCanvasRef.current;
     const personCanvas = personCanvasRef.current;
 
-    const selfieSegmentation = new SelfieSegmentation({
-      locateFile: (file) =>
-        `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`,
-    });
-    selfieSegmentation.setOptions({ modelSelection: 1 });
+    const initializeModels = async () => {
+      try {
+        // Use the centralized MediaPipe initialization utility
+        const { segmentation: selfieSegmentation, faceMesh } =
+          await initializeMediaPipeModels();
 
-    selfieSegmentation.onResults((results) => {
-      if (!mounted || !video || !outputCanvasRef.current) return;
+        selfieSegmentation.onResults((results) => {
+          if (!mounted || !video || !outputCanvasRef.current) return;
 
-      const w = video.videoWidth;
-      const h = video.videoHeight;
-      if (!w || !h) return;
+          const w = video.videoWidth;
+          const h = video.videoHeight;
+          if (!w || !h) return;
 
-      const targetAspect = aspectRef.current;
-      let outputW = w;
-      let outputH = w / targetAspect;
-      if (outputH > h) {
-        outputH = h;
-        outputW = h * targetAspect;
-      }
+          const targetAspect = aspectRef.current;
+          let outputW = w;
+          let outputH = w / targetAspect;
+          if (outputH > h) {
+            outputH = h;
+            outputW = h * targetAspect;
+          }
 
-      const offsetX = (w - outputW) / 2;
-      const offsetY = (h - outputH) / 2;
+          const offsetX = (w - outputW) / 2;
+          const offsetY = (h - outputH) / 2;
 
-      const outputCanvas = outputCanvasRef.current;
-      outputCanvas.width = outputW;
-      outputCanvas.height = outputH;
+          const outputCanvas = outputCanvasRef.current;
+          outputCanvas.width = outputW;
+          outputCanvas.height = outputH;
 
-      bgCanvas.width = outputW;
-      bgCanvas.height = outputH;
-      personCanvas.width = outputW;
-      personCanvas.height = outputH;
+          bgCanvas.width = outputW;
+          bgCanvas.height = outputH;
+          personCanvas.width = outputW;
+          personCanvas.height = outputH;
 
-      const outCtx = outputCanvas.getContext("2d");
-      const bgCtx = bgCanvas.getContext("2d");
-      const personCtx = personCanvas.getContext("2d");
+          const outCtx = outputCanvas.getContext("2d");
+          const bgCtx = bgCanvas.getContext("2d");
+          const personCtx = personCanvas.getContext("2d");
 
-      const bAmount = blurRef.current;
-      const bright = brightnessRef.current;
-      const z = zoomRef.current;
+          const bAmount = blurRef.current;
+          const bright = brightnessRef.current;
+          const z = zoomRef.current;
 
-      // Crop region to maintain aspect ratio
-      const srcX = offsetX;
-      const srcY = offsetY;
-      const srcW = outputW;
-      const srcH = outputH;
+          // Crop region to maintain aspect ratio
+          const srcX = offsetX;
+          const srcY = offsetY;
+          const srcW = outputW;
+          const srcH = outputH;
 
-      // Background
-      bgCtx.save();
-      bgCtx.filter = `${
-        blurEnabled && bAmount > 0 ? `blur(${bAmount}px)` : ""
-      } brightness(${bright})`;
-      bgCtx.drawImage(
-        results.image,
-        srcX,
-        srcY,
-        srcW,
-        srcH,
-        0,
-        0,
-        outputW,
-        outputH
-      );
-      bgCtx.restore();
+          // Background
+          bgCtx.save();
+          bgCtx.filter = `${
+            blurEnabled && bAmount > 0 ? `blur(${bAmount}px)` : ""
+          } brightness(${bright})`;
+          bgCtx.drawImage(
+            results.image,
+            srcX,
+            srcY,
+            srcW,
+            srcH,
+            0,
+            0,
+            outputW,
+            outputH
+          );
+          bgCtx.restore();
 
-      // Person
-      personCtx.save();
-      personCtx.filter = `brightness(${bright})`;
-      personCtx.drawImage(
-        results.image,
-        srcX,
-        srcY,
-        srcW,
-        srcH,
-        0,
-        0,
-        outputW,
-        outputH
-      );
-      personCtx.globalCompositeOperation = "destination-in";
-      personCtx.drawImage(
-        results.segmentationMask,
-        srcX,
-        srcY,
-        srcW,
-        srcH,
-        0,
-        0,
-        outputW,
-        outputH
-      );
-      personCtx.restore();
+          // Person
+          personCtx.save();
+          personCtx.filter = `brightness(${bright})`;
+          personCtx.drawImage(
+            results.image,
+            srcX,
+            srcY,
+            srcW,
+            srcH,
+            0,
+            0,
+            outputW,
+            outputH
+          );
+          personCtx.globalCompositeOperation = "destination-in";
+          personCtx.drawImage(
+            results.segmentationMask,
+            srcX,
+            srcY,
+            srcW,
+            srcH,
+            0,
+            0,
+            outputW,
+            outputH
+          );
+          personCtx.restore();
 
-      // Compose
-      outCtx.save();
-      outCtx.clearRect(0, 0, outputW, outputH);
+          // Compose
+          outCtx.save();
+          outCtx.clearRect(0, 0, outputW, outputH);
 
-      // Flip horizontally to show true camera view
-      outCtx.translate(outputW, 0);
-      outCtx.scale(-1, 1);
+          // Flip horizontally to show true camera view
+          outCtx.translate(outputW, 0);
+          outCtx.scale(-1, 1);
 
-      // Apply zoom
-      outCtx.translate(outputW / 2, outputH / 2);
-      outCtx.scale(z, z);
-      outCtx.translate(-outputW / 2, -outputH / 2);
+          // Flip horizontally only for front camera to show true camera view
+          if (facingMode === "user") {
+            outCtx.translate(outputW, 0);
+            outCtx.scale(-1, 1);
+          }
 
-      outCtx.drawImage(bgCanvas, 0, 0, outputW, outputH);
-      outCtx.drawImage(personCanvas, 0, 0, outputW, outputH);
+          // Apply zoom
+          outCtx.translate(outputW / 2, outputH / 2);
+          outCtx.scale(z, z);
+          outCtx.translate(-outputW / 2, -outputH / 2);
 
-      // === Quality Scoring ===
-      if (blurEnabled && outputCanvasRef.current) {
-        try {
-          const frame = personCtx.getImageData(0, 0, outputW, outputH);
-          // compute robust metrics (fast thanks to downsampling)
-          const lighting = computeLightingScore(frame);    // 0..100
-          const sharpness = computeSharpnessScore(frame);  // 0..100 (higher = sharper)
-          const contrast = computeContrastScore(frame);    // 0..100
-          const clarity = computeClarity(lighting, sharpness, contrast);
+          outCtx.drawImage(bgCanvas, 0, 0, outputW, outputH);
+          outCtx.drawImage(personCanvas, 0, 0, outputW, outputH);
 
-          setQualityScore({
-            lighting,
-            sharpness, 
-            clarity,
-          });
-        } catch (e) {
-          console.log("Quality scoring error:", e);
+          // === Quality Scoring ===
+          if (blurEnabled && outputCanvasRef.current) {
+            try {
+              const frame = personCtx.getImageData(0, 0, outputW, outputH);
+              // compute robust metrics (fast thanks to downsampling)
+              const lighting = computeLightingScore(frame); // 0..100
+              const sharpness = computeSharpnessScore(frame); // 0..100 (higher = sharper)
+              const contrast = computeContrastScore(frame); // 0..100
+              const clarity = computeClarity(lighting, sharpness, contrast);
+
+              setQualityScore({
+                lighting,
+                sharpness,
+                clarity,
+              });
+            } catch (e) {
+              console.log("Quality scoring error:", e);
+            }
+          }
+
+          outCtx.restore();
+        });
+
+        segmentationRef.current = selfieSegmentation;
+
+        faceMesh?.onResults((results) => {
+          if (!mounted || !isVerifying) return;
+
+          if (
+            results?.multiFaceLandmarks &&
+            results?.multiFaceLandmarks?.length > 0
+          ) {
+            const landmarks = results?.multiFaceLandmarks[0];
+            detectLivenessActions(landmarks);
+          }
+        });
+
+        faceMeshRef.current = faceMesh;
+        if (mounted) {
+          await startCamera(video, mounted);
+        }
+      } catch (err) {
+        console.error("Model initialization error:", err);
+        if (mounted) {
+          setError(
+            "Failed to initialize camera models. Please refresh the page."
+          );
         }
       }
+    };
 
-      outCtx.restore();
-    });
-
-    segmentationRef.current = selfieSegmentation;
-
-    // Initialize Face Mesh for liveness detection
-    const faceMesh = new FaceMesh({
-      locateFile: (file) =>
-        `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
-    });
-    faceMesh.setOptions({
-      maxNumFaces: 1,
-      refineLandmarks: true,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5,
-    });
-
-    faceMesh?.onResults((results) => {
-      if (!mounted || !isVerifying) return;
-      
-      if (results?.multiFaceLandmarks && results?.multiFaceLandmarks?.length > 0) {
-        const landmarks = results?.multiFaceLandmarks[0];
-        detectLivenessActions(landmarks);
-      }
-    });
-
-    faceMeshRef.current = faceMesh;
-
-    startCamera(video, mounted);
+    if (video) {
+      initializeModels();
+    }
 
     return () => {
       mounted = false;
@@ -324,8 +356,7 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
       segmentationRef.current = null;
       faceMeshRef.current = null;
     };
-  }, [blurEnabled, isVerifying, detectLivenessActions, startCamera]);
-
+  }, [blurEnabled, isVerifying, detectLivenessActions, startCamera, facingMode]);
   const handleSnapshot = () => {
     const canvas = outputCanvasRef.current;
     if (!canvas) return;
@@ -334,8 +365,26 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
     setPreviewOpen(true);
   };
 
+  const switchCamera = useCallback(async () => {
+    if (!isReady || !videoRef.current) return;
+
+    try {
+      setIsReady(false);
+      const newFacingMode = facingMode === "user" ? "environment" : "user";
+      setFacingMode(newFacingMode);
+
+      await startCamera(videoRef.current, true, newFacingMode);
+    } catch (error) {
+      console.error("Error switching camera:", error);
+      setError("Failed to switch camera. Please try again.");
+    }
+  }, [facingMode, isReady, startCamera]);
+
   const handleKeepSnapshot = () => {
-    setSnapshots((prev) => [...prev, { image: previewImage, challengeName: null }]);
+    setSnapshots((prev) => [
+      ...prev,
+      { image: previewImage, challengeName: null },
+    ]);
     setPreviewOpen(false);
     setPreviewImage(null);
   };
@@ -354,7 +403,7 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
 
     setIsCreatingGif(true);
     // Extract just the image URLs from snapshot objects
-    const imageUrls = snapshots.map(snap => snap.image);
+    const imageUrls = snapshots.map((snap) => snap.image);
     gifshot.createGIF(
       {
         images: imageUrls,
@@ -396,187 +445,234 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
         Smart Camera
       </Typography>
       {error ? (
-         <Box mb={2} p={2} bgcolor="#fdecea" borderRadius={1}>
+        <Box mb={2} p={2} bgcolor="#fdecea" borderRadius={1}>
           <Typography color="#b71c1c">{error}</Typography>
         </Box>
-      ):(
+      ) : (
         <>
-      <Box sx={{ position: "relative", borderRadius: 2, overflow: "hidden" }}>
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          style={{ display: "none" }}
-        />
-        <canvas
-          ref={outputCanvasRef}
-          style={{
-            width: "100%",
-            height: "auto",
-            aspectRatio: `${aspectRatio}`,
-            display: "block",
-            background: "#000",
-          }}
-        />
-      </Box>
-
-      <Stack direction="row" flexWrap="wrap" gap={2} mt={2} alignItems="center">
-        <Typography>Blur</Typography>
-        <Button onClick={decreaseBlur} disabled={!isReady}>
-          -
-        </Button>
-        <Typography>{blurAmount}px</Typography>
-        <Button onClick={increaseBlur} disabled={!isReady}>
-          +
-        </Button>
-
-        <Typography>Brightness</Typography>
-        <Button onClick={decreaseBrightness} disabled={!isReady}>
-          -
-        </Button>
-        <Typography>{brightness.toFixed(1)}</Typography>
-        <Button onClick={increaseBrightness} disabled={!isReady}>
-          +
-        </Button>
-
-        <Typography>Zoom</Typography>
-        <Button onClick={decreaseZoom} disabled={!isReady}>
-          -
-        </Button>
-        <Typography>{zoom.toFixed(2)}x</Typography>
-        <Button onClick={increaseZoom} disabled={!isReady}>
-          +
-        </Button>
-
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <InputLabel>Aspect</InputLabel>
-          <Select
-            label="Aspect"
-            value={aspectRatio}
-            onChange={(e) => setAspectRatio(Number(e.target.value))}
-            disabled={!isReady}
+          <Box
+            sx={{ position: "relative", borderRadius: 2, overflow: "hidden" }}
           >
-            <MenuItem value={16 / 9}>16:9</MenuItem>
-            <MenuItem value={4 / 3}>4:3</MenuItem>
-            <MenuItem value={1}>1:1</MenuItem>
-          </Select>
-        </FormControl>
-
-        <Button
-          variant="contained"
-          onClick={handleSnapshot}
-          disabled={!isReady || isVerifying}
-        >
-          Capture
-        </Button>
-
-        <Button
-          variant="contained"
-          color={isAllVerified ? "success" : isVerifying ? "error" : "success"}
-          onClick={isVerifying ? handleStopVerification : handleStartVerification}
-          disabled={!isReady}
-        >
-          {isAllVerified ? "Verified" : isVerifying ? "Stop Verify" : "Verify"}
-        </Button>
-      </Stack>
-
-      <Typography
-        variant="caption"
-        display="block"
-        mt={1}
-        color="text.secondary"
-      >
-        {isReady
-          ? "Camera active"
-          : "Starting camera... allow permission if prompted."}
-      </Typography>
-
-      {/* Liveness Detection Challenges */}
-      {isVerifying && (
-        <Box mt={3} p={2} bgcolor="#f5f5f5" borderRadius={2}>
-          {isAllVerified ? (
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                py: 3,
-                gap: 2,
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ display: "none" }}
+            />
+            <canvas
+              ref={outputCanvasRef}
+              style={{
+                width: "100%",
+                height: "auto",
+                aspectRatio: `${aspectRatio}`,
+                display: "block",
+                background: "#000",
               }}
-            >
-              <VerifiedIcon
-                sx={{
-                  fontSize: 64,
-                  color: "#4caf50",
-                }}
-              />
-              <Typography
-                variant="h5"
-                fontWeight={700}
-                sx={{
-                  color: "#2e7d32",
-                  textAlign: "center",
-                }}
-              >
-                Verified!
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  color: "#424242",
-                  textAlign: "center",
-                }}
-              >
-                All challenges completed successfully
-              </Typography>
-            </Box>
-          ) : (
-            <>
-              <Typography variant="subtitle1" fontWeight={600} mb={2}>
-                Complete these challenges:
-              </Typography>
-              <Stack spacing={1.5}>
-                {challenges.map((challenge, index) => (
-                  <Box
-                    key={index}
+            />
+            <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                  }}
+                >
+                  
+                  {/* Camera Switch Button */}
+                  <IconButton
+                    onClick={switchCamera}
+                    disabled={!isReady}
                     sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1.5,
-                      p: 1,
-                      borderRadius: 1,
-                      bgcolor: completedChallenges.has(index)
-                        ? "#e8f5e9"
-                        : "transparent",
-                      transition: "background-color 0.3s",
+                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                      color: 'white',
+                      '&:hover': {
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                      },
                     }}
                   >
-                    {completedChallenges.has(index) ? (
-                      <CheckCircleIcon sx={{ color: "#4caf50" }} />
-                    ) : (
-                      <RadioButtonUncheckedIcon sx={{ color: "#9e9e9e" }} />
-                    )}
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        color: completedChallenges.has(index)
-                          ? "#2e7d32"
-                          : "#424242",
-                        fontWeight: completedChallenges.has(index) ? 600 : 400,
-                      }}
-                    >
-                      {challenge}
-                    </Typography>
-                  </Box>
-                ))}
-              </Stack>
-            </>
+                    <FlipCameraIosIcon />
+                  </IconButton>
+                </Box>
+          </Box>
+
+          <Stack
+            direction="row"
+            flexWrap="wrap"
+            gap={2}
+            mt={2}
+            alignItems="center"
+          >
+            <Typography>Blur</Typography>
+            <Button onClick={decreaseBlur} disabled={!isReady}>
+              -
+            </Button>
+            <Typography>{blurAmount}px</Typography>
+            <Button onClick={increaseBlur} disabled={!isReady}>
+              +
+            </Button>
+
+            <Typography>Brightness</Typography>
+            <Button onClick={decreaseBrightness} disabled={!isReady}>
+              -
+            </Button>
+            <Typography>{brightness.toFixed(1)}</Typography>
+            <Button onClick={increaseBrightness} disabled={!isReady}>
+              +
+            </Button>
+
+            <Typography>Zoom</Typography>
+            <Button onClick={decreaseZoom} disabled={!isReady}>
+              -
+            </Button>
+            <Typography>{zoom.toFixed(2)}x</Typography>
+            <Button onClick={increaseZoom} disabled={!isReady}>
+              +
+            </Button>
+
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>Aspect</InputLabel>
+              <Select
+                label="Aspect"
+                value={aspectRatio}
+                onChange={(e) => setAspectRatio(Number(e.target.value))}
+                disabled={!isReady}
+              >
+                <MenuItem value={16 / 9}>16:9</MenuItem>
+                <MenuItem value={4 / 3}>4:3</MenuItem>
+                <MenuItem value={1}>1:1</MenuItem>
+              </Select>
+            </FormControl>
+            {/* Camera Mode Indicator */}
+                <Typography variant="body2" sx={{ ml: 1 }}>
+                  {facingMode === "user" ? "Front Camera" : "Back Camera"}
+                </Typography>
+            <Button
+              variant="contained"
+              onClick={handleSnapshot}
+              disabled={!isReady || isVerifying}
+            >
+              Capture
+            </Button>
+
+            <Button
+              variant="contained"
+              color={
+                isAllVerified ? "success" : isVerifying ? "error" : "success"
+              }
+              onClick={
+                isVerifying ? handleStopVerification : handleStartVerification
+              }
+              disabled={!isReady}
+            >
+              {isAllVerified
+                ? "Verified"
+                : isVerifying
+                ? "Stop Verify"
+                : "Verify"}
+            </Button>
+          </Stack>
+
+          <Typography
+            variant="caption"
+            display="block"
+            mt={1}
+            color="text.secondary"
+          >
+            {isReady
+              ? "Camera active"
+              : "Starting camera... allow permission if prompted."}
+          </Typography>
+
+          {/* Liveness Detection Challenges */}
+          {isVerifying && (
+            <Box mt={3} p={2} bgcolor="#f5f5f5" borderRadius={2}>
+              {isAllVerified ? (
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    py: 3,
+                    gap: 2,
+                  }}
+                >
+                  <VerifiedIcon
+                    sx={{
+                      fontSize: 64,
+                      color: "#4caf50",
+                    }}
+                  />
+                  <Typography
+                    variant="h5"
+                    fontWeight={700}
+                    sx={{
+                      color: "#2e7d32",
+                      textAlign: "center",
+                    }}
+                  >
+                    Verified!
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: "#424242",
+                      textAlign: "center",
+                    }}
+                  >
+                    All challenges completed successfully
+                  </Typography>
+                </Box>
+              ) : (
+                <>
+                  <Typography variant="subtitle1" fontWeight={600} mb={2}>
+                    Complete these challenges:
+                  </Typography>
+                  <Stack spacing={1.5}>
+                    {challenges.map((challenge, index) => (
+                      <Box
+                        key={index}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1.5,
+                          p: 1,
+                          borderRadius: 1,
+                          bgcolor: completedChallenges.has(index)
+                            ? "#e8f5e9"
+                            : "transparent",
+                          transition: "background-color 0.3s",
+                        }}
+                      >
+                        {completedChallenges.has(index) ? (
+                          <CheckCircleIcon sx={{ color: "#4caf50" }} />
+                        ) : (
+                          <RadioButtonUncheckedIcon sx={{ color: "#9e9e9e" }} />
+                        )}
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: completedChallenges.has(index)
+                              ? "#2e7d32"
+                              : "#424242",
+                            fontWeight: completedChallenges.has(index)
+                              ? 600
+                              : 400,
+                          }}
+                        >
+                          {challenge}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                </>
+              )}
+            </Box>
           )}
-        </Box>
-      )}
-      </>
+        </>
       )}
       {snapshots.length > 0 && (
         <Box mt={3}>
@@ -665,26 +761,25 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
       )}
 
       {blurEnabled && (
-      <Box
-        sx={{
-          position: "absolute",
-          bottom: 8,
-          right: 8,
-          bgcolor: "rgba(0,0,0,0.6)",
-          color: "#fff",
-          p: 1,
-          borderRadius: 1,
-          fontSize: "0.75rem",
-          textAlign: "right",
-          lineHeight: 1.3,
-        }}
-      >
-        <div>💡 Lighting: {qualityScore.lighting}%</div>
-        <div>🌫️ Sharpness: {qualityScore.sharpness}%</div>
-        <div>🔍 Clarity: {qualityScore.clarity}%</div>
-      </Box>
+        <Box
+          sx={{
+            position: "absolute",
+            bottom: 8,
+            right: 8,
+            bgcolor: "rgba(0,0,0,0.6)",
+            color: "#fff",
+            p: 1,
+            borderRadius: 1,
+            fontSize: "0.75rem",
+            textAlign: "right",
+            lineHeight: 1.3,
+          }}
+        >
+          <div>💡 Lighting: {qualityScore.lighting}%</div>
+          <div>🌫️ Sharpness: {qualityScore.sharpness}%</div>
+          <div>🔍 Clarity: {qualityScore.clarity}%</div>
+        </Box>
       )}
-
 
       {/* Snapshot Preview Dialog */}
       <SnapshotPreview
