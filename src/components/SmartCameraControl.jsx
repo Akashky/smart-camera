@@ -1,26 +1,15 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
   Box,
   Typography,
   Paper,
-  Button,
-  Stack,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
-  CircularProgress,
-  IconButton,
+  CardContent,
+  Card,
 } from "@mui/material";
 import { Camera } from "@mediapipe/camera_utils";
 import gifshot from "gifshot";
 import SnapshotPreview from "./SnapshotPreview";
 import { getExactAddress } from "./Helper";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
-import VerifiedIcon from "@mui/icons-material/Verified";
-import FlipCameraIosIcon from "@mui/icons-material/FlipCameraIos";
-import { challenges } from "../utils/constants/SmartCamera";
 import { useSomething } from "../utils/hooks/useSomething";
 import {
   computeClarity,
@@ -29,6 +18,11 @@ import {
   computeSharpnessScore,
 } from "../utils/imageQualityHelpers";
 import { initializeMediaPipeModels } from "../utils/mediaipipeInit";
+import Snapshots from "./Snapshots";
+import VerificationChallenges from "./VerificationChallenges";
+import GIFPreview from "./GIFPreview";
+import ActionControl from "./ActionControl";
+import CameraControl from "./CameraControl";
 
 const SmartCameraControl = ({ blurEnabled = true }) => {
   const videoRef = useRef(null);
@@ -62,6 +56,7 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
   // GIF creation
   const [gifSrc, setGifSrc] = useState(null);
   const [isCreatingGif, setIsCreatingGif] = useState(false);
+  const [cameraQuality, setCameraQuality] = useState("Good");
 
   // Refs for dynamic values
   const blurRef = useRef(blurAmount);
@@ -133,6 +128,23 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
       setLocation(address);
     });
   }, []);
+
+  useEffect(() => {
+    const clarity = qualityScore.clarity;
+    let quality = "Fair";
+    
+    if (clarity >= 80) {
+      quality = "Excellent";
+    } else if (clarity >= 60) {
+      quality = "Good";
+    } else if (clarity >= 40) {
+      quality = "Fair";
+    } else {
+      quality = "Poor";
+    }
+    
+    setCameraQuality(quality);
+  }, [qualityScore.clarity]);
 
   const startCamera = useCallback(
     async (video, mounted, facing = facingMode) => {
@@ -356,7 +368,13 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
       segmentationRef.current = null;
       faceMeshRef.current = null;
     };
-  }, [blurEnabled, isVerifying, detectLivenessActions, startCamera, facingMode]);
+  }, [
+    blurEnabled,
+    isVerifying,
+    detectLivenessActions,
+    startCamera,
+    facingMode,
+  ]);
   const handleSnapshot = () => {
     const canvas = outputCanvasRef.current;
     if (!canvas) return;
@@ -426,370 +444,100 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
     );
   };
 
-  // ===== UI CONTROLS =====
-  const increaseBlur = () => setBlurAmount((v) => Math.min(50, v + 1));
-  const decreaseBlur = () => setBlurAmount((v) => Math.max(0, v - 1));
-  const increaseBrightness = () =>
-    setBrightness((v) => Math.min(3, +(v + 0.1).toFixed(1)));
-  const decreaseBrightness = () =>
-    setBrightness((v) => Math.max(0.1, +(v - 0.1).toFixed(1)));
-  const increaseZoom = () => setZoom((v) => Math.min(3, +(v + 0.1).toFixed(2)));
-  const decreaseZoom = () => setZoom((v) => Math.max(1, +(v - 0.1).toFixed(2)));
-
   return (
-    <Paper
-      elevation={6}
-      sx={{ p: 3, maxWidth: 500, m: "32px auto", borderRadius: 2 }}
-    >
-      <Typography variant="h6" fontWeight={700} mb={2}>
-        Smart Camera
-      </Typography>
-      {error ? (
-        <Box mb={2} p={2} bgcolor="#fdecea" borderRadius={1}>
-          <Typography color="#b71c1c">{error}</Typography>
-        </Box>
-      ) : (
-        <>
-          <Box
-            sx={{ position: "relative", borderRadius: 2, overflow: "hidden" }}
-          >
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              style={{ display: "none" }}
-            />
-            <canvas
-              ref={outputCanvasRef}
-              style={{
-                width: "100%",
-                height: "auto",
-                aspectRatio: `${aspectRatio}`,
-                display: "block",
-                background: "#000",
-              }}
-            />
-            <Box
-                  sx={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                  }}
-                >
-                  
-                  {/* Camera Switch Button */}
-                  <IconButton
-                    onClick={switchCamera}
-                    disabled={!isReady}
-                    sx={{
-                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                      color: 'white',
-                      '&:hover': {
-                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                      },
-                    }}
-                  >
-                    <FlipCameraIosIcon />
-                  </IconButton>
-                </Box>
-          </Box>
-
-          <Stack
-            direction="row"
-            flexWrap="wrap"
-            gap={2}
-            mt={2}
-            alignItems="center"
-          >
-            <Typography>Blur</Typography>
-            <Button onClick={decreaseBlur} disabled={!isReady}>
-              -
-            </Button>
-            <Typography>{blurAmount}px</Typography>
-            <Button onClick={increaseBlur} disabled={!isReady}>
-              +
-            </Button>
-
-            <Typography>Brightness</Typography>
-            <Button onClick={decreaseBrightness} disabled={!isReady}>
-              -
-            </Button>
-            <Typography>{brightness.toFixed(1)}</Typography>
-            <Button onClick={increaseBrightness} disabled={!isReady}>
-              +
-            </Button>
-
-            <Typography>Zoom</Typography>
-            <Button onClick={decreaseZoom} disabled={!isReady}>
-              -
-            </Button>
-            <Typography>{zoom.toFixed(2)}x</Typography>
-            <Button onClick={increaseZoom} disabled={!isReady}>
-              +
-            </Button>
-
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel>Aspect</InputLabel>
-              <Select
-                label="Aspect"
-                value={aspectRatio}
-                onChange={(e) => setAspectRatio(Number(e.target.value))}
-                disabled={!isReady}
-              >
-                <MenuItem value={16 / 9}>16:9</MenuItem>
-                <MenuItem value={4 / 3}>4:3</MenuItem>
-                <MenuItem value={1}>1:1</MenuItem>
-              </Select>
-            </FormControl>
-            {/* Camera Mode Indicator */}
-                <Typography variant="body2" sx={{ ml: 1 }}>
-                  {facingMode === "user" ? "Front Camera" : "Back Camera"}
-                </Typography>
-            <Button
-              variant="contained"
-              onClick={handleSnapshot}
-              disabled={!isReady || isVerifying}
-            >
-              Capture
-            </Button>
-
-            <Button
-              variant="contained"
-              color={
-                isAllVerified ? "success" : isVerifying ? "error" : "success"
-              }
-              onClick={
-                isVerifying ? handleStopVerification : handleStartVerification
-              }
-              disabled={!isReady}
-            >
-              {isAllVerified
-                ? "Verified"
-                : isVerifying
-                ? "Stop Verify"
-                : "Verify"}
-            </Button>
-          </Stack>
-
+    <>
+      <Card
+        elevation={6}
+        sx={{
+          maxWidth: 650,
+          margin: "auto",
+          mt: 5,
+          borderRadius: 4,
+          p: 2,
+          background: "#ffffff",
+        }}
+      >
+        <CardContent>
+          {/* TITLE */}
           <Typography
-            variant="caption"
-            display="block"
-            mt={1}
-            color="text.secondary"
+            variant="h5"
+            align="center"
+            sx={{ fontWeight: 700, mb: 3 }}
           >
-            {isReady
-              ? "Camera active"
-              : "Starting camera... allow permission if prompted."}
+            Smart Camera
           </Typography>
-
-          {/* Liveness Detection Challenges */}
-          {isVerifying && (
-            <Box mt={3} p={2} bgcolor="#f5f5f5" borderRadius={2}>
-              {isAllVerified ? (
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    py: 3,
-                    gap: 2,
-                  }}
-                >
-                  <VerifiedIcon
-                    sx={{
-                      fontSize: 64,
-                      color: "#4caf50",
-                    }}
-                  />
-                  <Typography
-                    variant="h5"
-                    fontWeight={700}
-                    sx={{
-                      color: "#2e7d32",
-                      textAlign: "center",
-                    }}
-                  >
-                    Verified!
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: "#424242",
-                      textAlign: "center",
-                    }}
-                  >
-                    All challenges completed successfully
-                  </Typography>
-                </Box>
-              ) : (
-                <>
-                  <Typography variant="subtitle1" fontWeight={600} mb={2}>
-                    Complete these challenges:
-                  </Typography>
-                  <Stack spacing={1.5}>
-                    {challenges.map((challenge, index) => (
-                      <Box
-                        key={index}
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1.5,
-                          p: 1,
-                          borderRadius: 1,
-                          bgcolor: completedChallenges.has(index)
-                            ? "#e8f5e9"
-                            : "transparent",
-                          transition: "background-color 0.3s",
-                        }}
-                      >
-                        {completedChallenges.has(index) ? (
-                          <CheckCircleIcon sx={{ color: "#4caf50" }} />
-                        ) : (
-                          <RadioButtonUncheckedIcon sx={{ color: "#9e9e9e" }} />
-                        )}
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: completedChallenges.has(index)
-                              ? "#2e7d32"
-                              : "#424242",
-                            fontWeight: completedChallenges.has(index)
-                              ? 600
-                              : 400,
-                          }}
-                        >
-                          {challenge}
-                        </Typography>
-                      </Box>
-                    ))}
-                  </Stack>
-                </>
-              )}
-            </Box>
-          )}
-        </>
-      )}
-      {snapshots.length > 0 && (
-        <Box mt={3}>
-          <Typography variant="subtitle1">Saved Snapshots:</Typography>
-          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mt: 1 }}>
-            {snapshots.map((snap, i) => (
-              <Box
-                key={i}
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 0.5,
-                }}
-              >
-                <img
-                  src={snap.image}
-                  alt={`snapshot-${i}`}
-                  style={{
-                    width: 120,
-                    borderRadius: 8,
-                    border: "1px solid #ccc",
-                  }}
-                />
-                {snap.challengeName && (
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      textAlign: "center",
-                      color: "text.secondary",
-                      fontSize: "0.75rem",
-                      maxWidth: 120,
-                    }}
-                  >
-                    {snap.challengeName}
-                  </Typography>
-                )}
-              </Box>
-            ))}
-          </Box>
-
-          <Box mt={2}>
-            <Button
-              variant="contained"
-              color="secondary"
-              onClick={createGifFromSnapshots}
-              disabled={isCreatingGif}
-            >
-              {isCreatingGif ? (
-                <CircularProgress size={20} sx={{ mr: 1 }} />
-              ) : (
-                "Create GIF"
-              )}
-            </Button>
-          </Box>
-        </Box>
-      )}
-
-      {/* === Generated GIF Preview === */}
-      {gifSrc && (
-        <Box mt={3} textAlign="center">
-          <Typography variant="subtitle1">Generated GIF:</Typography>
-          <img
-            src={gifSrc}
-            alt="Generated GIF"
-            style={{
-              maxWidth: "100%",
-              borderRadius: 8,
-              border: "2px solid #444",
+          <Paper
+            elevation={4}
+            sx={{
+              position: "relative",
+              overflow: "hidden",
+              borderRadius: 3,
+              mb: 3,
             }}
-          />
-          <Box mt={1}>
-            <Button
-              variant="outlined"
-              onClick={() => {
-                const a = document.createElement("a");
-                a.href = gifSrc;
-                a.download = "smart_camera.gif";
-                a.click();
-              }}
-            >
-              Download GIF
-            </Button>
-          </Box>
-        </Box>
-      )}
+          >
+            {error ? (
+              <Box mb={2} p={2} bgcolor="#fdecea" borderRadius={1}>
+                <Typography color="#b71c1c">{error}</Typography>
+              </Box>
+            ) : (
+              <>
+                {/* === Camera View === */}
+                <CameraControl
+                  videoRef={videoRef}
+                  outputCanvasRef={outputCanvasRef}
+                  aspectRatio={aspectRatio}
+                  isReady={isReady}
+                  qualityScore={qualityScore}
+                  cameraQuality={cameraQuality}
+                />
+                {/* === Action Controls === */}
+                <ActionControl
+                  blurAmount={blurAmount}
+                  setBlurAmount={setBlurAmount}
+                  brightness={brightness}
+                  setBrightness={setBrightness}
+                  zoom={zoom}
+                  setZoom={setZoom}
+                  aspectRatio={aspectRatio}
+                  setAspectRatio={setAspectRatio}
+                  isReady={isReady}
+                  switchCamera={switchCamera}
+                  handleSnapshot={handleSnapshot}
+                  isVerifying={isVerifying}
+                  handleStartVerification={handleStartVerification}
+                  handleStopVerification={handleStopVerification}
+                />
 
-      {blurEnabled && (
-        <Box
-          sx={{
-            position: "absolute",
-            bottom: 8,
-            right: 8,
-            bgcolor: "rgba(0,0,0,0.6)",
-            color: "#fff",
-            p: 1,
-            borderRadius: 1,
-            fontSize: "0.75rem",
-            textAlign: "right",
-            lineHeight: 1.3,
-          }}
-        >
-          <div>💡 Lighting: {qualityScore.lighting}%</div>
-          <div>🌫️ Sharpness: {qualityScore.sharpness}%</div>
-          <div>🔍 Clarity: {qualityScore.clarity}%</div>
-        </Box>
-      )}
+                {/* === Verification Challenges === */}
+                <VerificationChallenges
+                  isVerifying={isVerifying}
+                  completedChallenges={completedChallenges}
+                  isAllVerified={isAllVerified}
+                />
+                {/* === Snapshots Preview === */}
+                <Snapshots
+                  snapshots={snapshots}
+                  createGifFromSnapshots={createGifFromSnapshots}
+                  isCreatingGif={isCreatingGif}
+                />
 
-      {/* Snapshot Preview Dialog */}
-      <SnapshotPreview
-        open={previewOpen}
-        imageSrc={previewImage}
-        onKeep={handleKeepSnapshot}
-        onRetake={handleRetakeSnapshot}
-        location={location}
-      />
-    </Paper>
+                {/* === Generated GIF Preview === */}
+                <GIFPreview gifSrc={gifSrc} />
+
+                {/* Snapshot Preview Dialog */}
+                <SnapshotPreview
+                  open={previewOpen}
+                  imageSrc={previewImage}
+                  onKeep={handleKeepSnapshot}
+                  onRetake={handleRetakeSnapshot}
+                  location={location}
+                />
+              </>
+            )}
+          </Paper>
+        </CardContent>
+      </Card>
+    </>
   );
 };
 

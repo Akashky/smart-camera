@@ -9,7 +9,8 @@ const getExactAddress = async (lat, lon) => {
     if (data?.address) {
       return {
         fullAddress: data.display_name || "",
-        city: data.address.city || data.address.town || data.address.village || "",
+        city:
+          data.address.city || data.address.town || data.address.village || "",
         state: data.address.state || "",
         country: data.address.country || "",
         postcode: data.address.postcode || "",
@@ -25,3 +26,18 @@ const getExactAddress = async (lat, lon) => {
   }
 };
 export { getExactAddress };
+
+export const getQualityColor = (quality) => {
+  switch (quality) {
+    case "Excellent":
+      return "success";
+    case "Good":
+      return "primary";
+    case "Fair":
+      return "warning";
+    case "Poor":
+      return "error";
+    default:
+      return "default";
+  }
+};
