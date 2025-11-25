@@ -23,6 +23,7 @@ import VerificationChallenges from "./VerificationChallenges";
 import GIFPreview from "./GIFPreview";
 import ActionControl from "./ActionControl";
 import CameraControl from "./CameraControl";
+import { getDeviceType } from "./Helper";
 
 const SmartCameraControl = ({ blurEnabled = true }) => {
   const videoRef = useRef(null);
@@ -33,7 +34,7 @@ const SmartCameraControl = ({ blurEnabled = true }) => {
   const faceMeshRef = useRef(null);
   const cameraRef = useRef(null);
   const challengeImageCaptureRef = useRef(null);
-  const [facingMode, setFacingMode] = useState("user");
+  const [facingMode, setFacingMode] = useState(getDeviceType() === "mobile" ? "environment" : "user");
 
   const [blurAmount, setBlurAmount] = useState(12);
   const [brightness, setBrightness] = useState(1);
